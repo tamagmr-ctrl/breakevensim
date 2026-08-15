@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>損益分岐点シミュレーター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#151830;
+    --navy:#1c2140;
+    --navy-light:#262c52;
+    --water:#213a5f;
+    --water-deep:#16283f;
+    --gold:#e8b84b;
+    --gold-dim:#a8873f;
+    --cream:#f2ead9;
+    --cream-dim:#c9c1ae;
+    --profit:#7fbf8f;
+    --loss:#e0806f;
+    --hull:#8a6a45;
+    --hull-dark:#5c4530;
+    --line:#3a4270;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, #2a3060 0%, transparent 60%),
+      var(--navy-deep);
+    color:var(--cream);
+    font-family:'Noto Sans JP', sans-serif;
+    min-height:100vh;
+    padding:32px 20px 60px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:.18em;
+    color:var(--gold);
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'Shippori Mincho', serif;
+    font-weight:700;
+    font-size:clamp(28px,4vw,42px);
+    margin:0 0 10px;
+    line-height:1.3;
+  }
+  .lede{
+    color:var(--cream-dim);
+    font-size:15px;
+    line-height:1.8;
+    max-width:640px;
+    margin:0 0 32px;
+  }
+
+  /* ---- Hero: ship gauge ---- */
+  .hero{
+    position:relative;
+    background:linear-gradient(180deg, var(--navy) 0%, var(--navy) 46%, var(--water) 46%, var(--water-deep) 100%);
+    border:1px solid var(--line);
+    border-radius:18px;
+    overflow:hidden;
+    margin-bottom:28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  }
+  .hero-inner{
+    position:relative;
+    height:340px;
+  }
+  #heroSvg{position:absolute; inset:0; width:100%; height:100%; display:block;}
+
+  .status-tag{
+    position:absolute;
+    top:20px; left:20px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:.1em;
+    padding:8px 14px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.18);
+    background:rgba(0,0,0,.28);
+    backdrop-filter: blur(4px);
+    transition: color .25s, border-color .25s;
+  }
+  .status-tag b{font-family:'Shippori Mincho',serif; font-size:14px; margin-left:4px;}
+
+  .hero-readout{
+    position:absolute;
+    top:20px; right:20px;
+    text-align:right;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .hero-readout .label{font-size:11px; color:var(--cream-dim); letter-spacing:.08em;}
+  .hero-readout .value{font-size:26px; font-weight:700; transition:color .25s;}
+
+  /* ---- Controls ---- */
+  .panel{
+    background:var(--navy);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:26px 28px 10px;
+    margin-bottom:24px;
+  }
+  .panel h2{
+    font-family:'Shippori Mincho', serif;
+    font-size:19px;
+    margin:0 0 20px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .panel h2::before{
+    content:'';
+    width:6px; height:6px; border-radius:50%;
+    background:var(--gold);
+    display:inline-block;
+  }
+
+  .slider-row{margin-bottom:24px;}
+  .slider-row .row-top{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:10px;
+    flex-wrap:wrap; gap:6px;
+  }
+  .slider-row label{font-size:14px; font-weight:500; color:var(--cream);}
+  .slider-row .sub{font-size:12px; color:var(--cream-dim); margin-left:8px;}
+  .slider-row .val{
+    font-family:'JetBrains Mono', monospace;
+    font-size:17px; font-weight:700; color:var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
+  input[type=range]{
+    -webkit-appearance:none; appearance:none;
+    width:100%; height:6px; border-radius:3px;
+    background: var(--line);
+    outline:none;
+    margin:0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:20px; height:20px; border-radius:50%;
+    background: var(--gold);
+    border: 3px solid var(--navy-deep);
+    box-shadow: 0 0 0 2px var(--gold);
+    cursor:pointer;
+    margin-top:-1px;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px; height:20px; border-radius:50%;
+    background: var(--gold);
+    border: 3px solid var(--navy-deep);
+    box-shadow: 0 0 0 2px var(--gold);
+    cursor:pointer;
+  }
+
+  /* ---- Metric cards ---- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+    gap:14px;
+    margin-bottom:24px;
+  }
+  .card{
+    background:var(--navy);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 18px;
+    position:relative;
+    overflow:hidden;
+  }
+  .card.accent{border-color:var(--gold-dim);}
+  .card .k{
+    font-size:12px; color:var(--cream-dim);
+    letter-spacing:.03em;
+    margin:0 0 8px;
+  }
+  .card .v{
+    font-family:'JetBrains Mono', monospace;
+    font-size:22px; font-weight:700;
+    font-variant-numeric: tabular-nums;
+    line-height:1.2;
+  }
+  .card .u{font-size:12px; color:var(--cream-dim); font-weight:400; margin-left:2px;}
+  .card.plus .v{color:var(--profit);}
+  .card.minus .v{color:var(--loss);}
+  .card.gold .v{color:var(--gold);}
+
+  /* ---- Chart ---- */
+  .chart-panel{
+    background:var(--navy);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:26px 28px;
+    margin-bottom:24px;
+  }
+  .chart-panel h2{
+    font-family:'Shippori Mincho', serif;
+    font-size:19px; margin:0 0 4px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .chart-panel h2::before{content:''; width:6px; height:6px; border-radius:50%; background:var(--gold); display:inline-block;}
+  .chart-sub{font-size:13px; color:var(--cream-dim); margin:0 0 18px;}
+  #chartSvg{width:100%; height:auto; display:block;}
+
+  .legend{display:flex; flex-wrap:wrap; gap:18px; margin-top:14px; font-size:12.5px; color:var(--cream-dim);}
+  .legend span{display:inline-flex; align-items:center; gap:7px;}
+  .legend i{width:16px; height:3px; border-radius:2px; display:inline-block;}
+
+  .scale-row{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .scale-row .scale-label{
+    font-size:12px; color:var(--cream-dim); letter-spacing:.06em;
+  }
+  .seg{
+    display:inline-flex;
+    background:var(--navy-deep);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:3px;
+  }
+  .seg button{
+    font-family:'Noto Sans JP', sans-serif;
+    font-size:12.5px;
+    padding:7px 16px;
+    border:none;
+    border-radius:999px;
+    background:transparent;
+    color:var(--cream-dim);
+    cursor:pointer;
+    transition: background .15s, color .15s;
+  }
+  .seg button.active{
+    background:var(--gold);
+    color:var(--navy-deep);
+    font-weight:700;
+  }
+  .fixed-max-input{
+    display:none;
+    align-items:center;
+    gap:8px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    color:var(--cream-dim);
+  }
+  .fixed-max-input.show{display:inline-flex;}
+  .fixed-max-input input{
+    width:100px;
+    background:var(--navy-deep);
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--cream);
+    font-family:'JetBrains Mono', monospace;
+    font-size:13px;
+    padding:6px 10px;
+    outline:none;
+  }
+  .fixed-max-input input:focus{border-color:var(--gold-dim);}
+
+  /* ---- Explainer ---- */
+  .explain{
+    background:var(--navy);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:26px 28px;
+  }
+  .explain h2{
+    font-family:'Shippori Mincho', serif;
+    font-size:19px; margin:0 0 16px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .explain h2::before{content:''; width:6px; height:6px; border-radius:50%; background:var(--gold); display:inline-block;}
+  .formula{
+    font-family:'JetBrains Mono', monospace;
+    font-size:14px;
+    background:var(--navy-deep);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 18px;
+    margin:0 0 14px;
+    color:var(--cream);
+    line-height:2;
+  }
+  .formula .gold{color:var(--gold);}
+  .formula .profit{color:var(--profit);}
+  .formula .loss{color:var(--loss);}
+  .explain p{font-size:14px; line-height:1.9; color:var(--cream-dim); margin:0 0 10px;}
+  .explain p b{color:var(--cream); font-weight:700;}
+
+  footer{
+    text-align:center;
+    font-size:12px;
+    color:var(--cream-dim);
+    margin-top:30px;
+    font-family:'JetBrains Mono', monospace;
+    letter-spacing:.04em;
+  }
+
+  @media (max-width:600px){
+    .panel, .chart-panel, .explain{padding:20px 18px;}
+    .hero-inner{height:300px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">Break-even Point Simulator</p>
+  <h1>損益分岐点シミュレーター</h1>
+  <p class="lede">売上高・変動費・限界利益・固定費の関係を、数字とグラフ、そして一隻の船で確かめられます。スライダーを動かして、船が浮くか沈むかを見てみてください。</p>
+
+  <!-- HERO: SHIP GAUGE -->
+  <div class="hero">
+    <div class="hero-inner">
+      <svg id="heroSvg" viewBox="0 0 1000 340" preserveAspectRatio="xMidYMid slice"></svg>
+      <div class="status-tag" id="statusTag">状態 <b id="statusText">—</b></div>
+      <div class="hero-readout">
+        <div class="label">安全余裕率</div>
+        <div class="value" id="marginValue">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="panel">
+    <h2>入力する</h2>
+
+    <div class="slider-row">
+      <div class="row-top">
+        <label>売上高<span class="sub">Sales</span></label>
+        <span class="val" id="salesVal">¥0</span>
+      </div>
+      <input type="range" id="sales" min="0" max="20000000" step="100000" value="8000000">
+    </div>
+
+    <div class="slider-row">
+      <div class="row-top">
+        <label>変動費率<span class="sub">Variable cost ratio — 売上高に対する変動費の割合</span></label>
+        <span class="val" id="vrVal">0%</span>
+      </div>
+      <input type="range" id="vr" min="0" max="90" step="1" value="60">
+    </div>
+
+    <div class="slider-row">
+      <div class="row-top">
+        <label>固定費<span class="sub">Fixed costs — 家賃・人件費・減価償却費など</span></label>
+        <span class="val" id="fcVal">¥0</span>
+      </div>
+      <input type="range" id="fc" min="0" max="10000000" step="100000" value="3000000">
+    </div>
+  </div>
+
+  <!-- METRIC CARDS -->
+  <div class="grid">
+    <div class="card">
+      <p class="k">売上高</p>
+      <p class="v" id="c-sales">¥0</p>
+    </div>
+    <div class="card">
+      <p class="k">変動費</p>
+      <p class="v" id="c-vc">¥0</p>
+    </div>
+    <div class="card accent">
+      <p class="k">限界利益<span class="u" id="c-cmrLabel"></span></p>
+      <p class="v" id="c-cmr">¥0</p>
+    </div>
+    <div class="card">
+      <p class="k">固定費</p>
+      <p class="v" id="c-fc">¥0</p>
+    </div>
+    <div class="card gold">
+      <p class="k">損益分岐点売上高</p>
+      <p class="v" id="c-bep">¥0</p>
+    </div>
+    <div class="card" id="c-profitCard">
+      <p class="k">利益（営業利益）</p>
+      <p class="v" id="c-profit">¥0</p>
+    </div>
+  </div>
+
+  <!-- CHART -->
+  <div class="chart-panel">
+    <h2>費用・収益分岐図（CVPチャート）</h2>
+    <p class="chart-sub">横軸＝売上高、縦軸＝金額。売上高線と総費用線が交わる点が損益分岐点です。</p>
+
+    <div class="scale-row">
+      <span class="scale-label">スケール</span>
+      <div class="seg" id="scaleSeg">
+        <button type="button" id="scaleAutoBtn" class="active">自動</button>
+        <button type="button" id="scaleFixedBtn">固定</button>
+      </div>
+      <label class="fixed-max-input" id="fixedMaxWrap">
+        上限
+        <input type="number" id="fixedMaxInput" min="100000" step="100000" value="20000000">
+        円
+      </label>
+    </div>
+
+    <svg id="chartSvg" viewBox="0 0 1000 460"></svg>
+    <div class="legend">
+      <span><i style="background:#e8e2d0;"></i>売上高線</span>
+      <span><i style="background:#7d8cc4;"></i>総費用線（固定費＋変動費）</span>
+      <span><i style="background:var(--gold);"></i>損益分岐点</span>
+      <span><i style="background:var(--profit);"></i>現在地点（利益）</span>
+      <span><i style="background:var(--loss);"></i>現在地点（損失）</span>
+    </div>
+  </div>
+
+  <!-- EXPLAINER -->
+  <div class="explain">
+    <h2>関係を式で見る</h2>
+    <div class="formula">
+      売上高 − 変動費 = <span class="gold">限界利益</span><br>
+      <span class="gold">限界利益</span> − 固定費 = <span class="profit">利益</span>（マイナスなら<span class="loss">損失</span>）<br>
+      損益分岐点売上高 = 固定費 ÷ 限界利益率
+    </div>
+    <p><b>限界利益</b>は、売上が1円増えるごとに固定費の回収と利益に充てられる金額です。限界利益率が高いほど、少ない売上増加で固定費を回収しやすくなります。</p>
+    <p><b>固定費</b>は売上の増減に関わらず発生し続ける費用です。家賃・人件費・減価償却費などがこれにあたり、これが重いほど損益分岐点は高くなります＝船を浮かせるために必要な売上のラインが上がります。</p>
+    <p><b>損益分岐点</b>は、限界利益がちょうど固定費と一致する売上高です。売上がこれを超えれば船は浮き（利益）、下回れば固定費という重りに引かれて沈みます（損失）。</p>
+  </div>
+
+  <footer>損益分岐点 = 固定費 ÷ 限界利益率　｜　限界利益率 = 1 − 変動費率</footer>
+</div>
+
+<script>
+const salesEl = document.getElementById('sales');
+const vrEl = document.getElementById('vr');
+const fcEl = document.getElementById('fc');
+
+const salesVal = document.getElementById('salesVal');
+const vrVal = document.getElementById('vrVal');
+const fcVal = document.getElementById('fcVal');
+
+const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+const pct = n => (n*100).toFixed(1) + '%';
+
+function calc(){
+  const S = Number(salesEl.value);
+  const vr = Number(vrEl.value)/100;
+  const F = Number(fcEl.value);
+
+  const VC = S * vr;
+  const CMR_ratio = 1 - vr; // 限界利益率
+  const CM = S - VC;        // 限界利益
+  const BEP = CMR_ratio > 0 ? F / CMR_ratio : Infinity;
+  const profit = CM - F;
+  const mos = S > 0 ? (S - BEP) / S : -1; // 安全余裕率
+
+  return {S, vr, F, VC, CM, CMR_ratio, BEP, profit, mos};
+}
+
+function updateReadouts(d){
+  salesVal.textContent = yen(d.S);
+  vrVal.textContent = Math.round(d.vr*100) + '%';
+  fcVal.textContent = yen(d.F);
+
+  document.getElementById('c-sales').textContent = yen(d.S);
+  document.getElementById('c-vc').textContent = yen(d.VC);
+  document.getElementById('c-cmr').textContent = yen(d.CM);
+  document.getElementById('c-cmrLabel').textContent = ' (' + pct(d.CMR_ratio) + ')';
+  document.getElementById('c-fc').textContent = yen(d.F);
+  document.getElementById('c-bep').textContent = isFinite(d.BEP) ? yen(d.BEP) : '—';
+
+  const profitCard = document.getElementById('c-profitCard');
+  const profitVal = document.getElementById('c-profit');
+  profitVal.textContent = (d.profit>=0? '+':'') + yen(d.profit);
+  profitCard.classList.remove('plus','minus');
+  profitCard.classList.add(d.profit>=0 ? 'plus':'minus');
+
+  const marginValue = document.getElementById('marginValue');
+  marginValue.textContent = isFinite(d.mos) ? (d.mos>=0? '+':'') + pct(d.mos) : '—';
+  marginValue.style.color = d.mos>=0 ? 'var(--profit)' : 'var(--loss)';
+
+  const statusTag = document.getElementById('statusTag');
+  const statusText = document.getElementById('statusText');
+  if(d.profit >= 0){
+    statusText.textContent = '航行中（利益）';
+    statusTag.style.borderColor = 'rgba(127,191,143,.5)';
+    statusTag.style.color = '#cfeedb';
+  } else {
+    statusText.textContent = '浸水中（損失）';
+    statusTag.style.borderColor = 'rgba(224,128,111,.5)';
+    statusTag.style.color = '#f6d3cb';
+  }
+}
+
+/* ---------------- HERO SHIP GAUGE ---------------- */
+const heroSvg = document.getElementById('heroSvg');
+
+function buildHeroStatic(){
+  // static background elements (sky, moon, stars) drawn once
+  return `
+    <defs>
+      <clipPath id="waterClip"><rect x="0" y="155" width="1000" height="185"/></clipPath>
+    </defs>
+    <circle cx="900" cy="60" r="26" fill="#f2ead9" opacity="0.9"/>
+    <circle cx="909" cy="52" r="23" fill="var(--navy)"/>
+    <g stroke="#e8e4d8" stroke-width="1" opacity="0.12">
+      <line x1="0" y1="40" x2="180" y2="10"/>
+      <line x1="0" y1="80" x2="150" y2="55"/>
+      <line x1="820" y1="120" x2="650" y2="90"/>
+    </g>
+  `;
+}
+
+function heroFrame(d, waterlineY, shipY, tilt){
+  const profitColor = d.profit>=0 ? '#7fbf8f' : '#e0806f';
+  return `
+    ${buildHeroStatic()}
+    <rect x="0" y="155" width="1000" height="185" fill="#213a5f"/>
+    <g clip-path="url(#waterClip)">
+      <path d="M-40 ${waterlineY+15} Q 60 ${waterlineY} 160 ${waterlineY+15} T 360 ${waterlineY+15} T 560 ${waterlineY+15} T 760 ${waterlineY+15} T 960 ${waterlineY+15} T 1160 ${waterlineY+15}" fill="none" stroke="#2f4c78" stroke-width="5"/>
+      <path d="M-40 ${waterlineY+45} Q 60 ${waterlineY+30} 160 ${waterlineY+45} T 360 ${waterlineY+45} T 560 ${waterlineY+45} T 760 ${waterlineY+45} T 960 ${waterlineY+45} T 1160 ${waterlineY+45}" fill="none" stroke="#26405f" stroke-width="4"/>
+    </g>
+    <line x1="0" y1="${waterlineY}" x2="1000" y2="${waterlineY}" stroke="#e8b84b" stroke-width="3" stroke-dasharray="9 6" opacity="0.85"/>
+    <text x="14" y="${waterlineY-8}" font-family="JetBrains Mono, monospace" font-size="12" fill="#e8b84b">損益分岐点の水位</text>
+
+    <g transform="translate(500,${shipY}) rotate(${tilt})">
+      <path d="M-110 30 L110 30 L88 68 Q0 82 -88 68 Z" fill="#8a6a45" stroke="#151830" stroke-width="3"/>
+      <path d="M-110 30 L110 30 L110 40 L-110 40 Z" fill="#a8825a" stroke="#151830" stroke-width="2"/>
+      <rect x="-32" y="-6" width="70" height="36" fill="#b09169" stroke="#151830" stroke-width="3"/>
+      <rect x="-22" y="4" width="18" height="16" fill="#262c52" stroke="#151830" stroke-width="1.5"/>
+      <rect x="4" y="4" width="18" height="16" fill="#262c52" stroke="#151830" stroke-width="1.5"/>
+      <line x1="0" y1="-6" x2="0" y2="-58" stroke="#5c4530" stroke-width="5" stroke-linecap="round"/>
+      <path d="M0 -58 L38 -42 L0 -28 Z" fill="#f2ead9" stroke="#151830" stroke-width="2"/>
+    </g>
+
+    <circle cx="500" cy="${shipY+45}" r="6" fill="${profitColor}" opacity="0.9"/>
+  `;
+}
+
+function renderHero(d){
+  // waterline fixed near vertical middle of the water band; ship position moves relative to it based on margin of safety
+  const waterlineY = 175;
+  const maxOffset = 95; // how far the ship can rise/sink from the waterline
+  const mos = isFinite(d.mos) ? Math.max(-1, Math.min(1, d.mos)) : (d.profit>=0?1:-1);
+  const shipY = waterlineY - mos*maxOffset*0.9;
+  const tilt = mos>=0 ? Math.max(-6, -mos*8) : Math.min(26, -mos*26);
+  heroSvg.innerHTML = heroFrame(d, waterlineY, shipY, tilt);
+}
+
+/* ---------------- CVP CHART ---------------- */
+const chartSvg = document.getElementById('chartSvg');
+const CW = 1000, CH = 460;
+const padL = 90, padR = 40, padT = 30, padB = 60;
+const plotW = CW - padL - padR;
+const plotH = CH - padT - padB;
+
+let scaleMode = 'auto'; // 'auto' | 'fixed'
+let fixedMaxValue = 20000000;
+
+function renderChart(d){
+  const autoMax = Math.max(d.S, isFinite(d.BEP)? d.BEP: 0) * 1.4 || 1000000;
+  const maxX = scaleMode === 'fixed' ? Math.max(fixedMaxValue, 100000) : autoMax;
+  const maxY = maxX; // symmetric scale since sales line has slope 1
+  const x2px = x => padL + (x/maxX)*plotW;
+  const y2px = y => padT + plotH - (y/maxY)*plotH;
+
+  // axis
+  let s = `
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+plotH}" stroke="#3a4270" stroke-width="1.5"/>
+    <line x1="${padL}" y1="${padT+plotH}" x2="${padL+plotW}" y2="${padT+plotH}" stroke="#3a4270" stroke-width="1.5"/>
+  `;
+
+  // gridlines + axis labels (5 ticks)
+  for(let i=0;i<=4;i++){
+    const gx = padL + (plotW/4)*i;
+    const val = (maxX/4)*i;
+    s += `<line x1="${gx}" y1="${padT}" x2="${gx}" y2="${padT+plotH}" stroke="#262c52" stroke-width="1"/>`;
+    s += `<text x="${gx}" y="${padT+plotH+22}" font-family="JetBrains Mono, monospace" font-size="11" fill="#c9c1ae" text-anchor="middle">${(val/10000).toFixed(0)}万</text>`;
+    const gy = padT + plotH - (plotH/4)*i;
+    s += `<text x="${padL-12}" y="${gy+4}" font-family="JetBrains Mono, monospace" font-size="11" fill="#c9c1ae" text-anchor="end">${(val/10000).toFixed(0)}万</text>`;
+  }
+
+  // sales line (y = x)
+  const salesLine = `M ${x2px(0)} ${y2px(0)} L ${x2px(maxX)} ${y2px(maxX)}`;
+  // total cost line (y = F + vr*x)
+  const cost0 = d.F;
+  const costMax = d.F + d.vr*maxX;
+  const costLine = `M ${x2px(0)} ${y2px(cost0)} L ${x2px(maxX)} ${y2px(costMax)}`;
+
+  s += `<path d="${salesLine}" fill="none" stroke="#e8e2d0" stroke-width="2.5"/>`;
+  s += `<path d="${costLine}" fill="none" stroke="#7d8cc4" stroke-width="2.5"/>`;
+
+  // fixed cost baseline reference
+  s += `<line x1="${x2px(0)}" y1="${y2px(d.F)}" x2="${x2px(maxX)}" y2="${y2px(d.F)}" stroke="#7d8cc4" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>`;
+  s += `<text x="${padL+8}" y="${y2px(d.F)-8}" font-family="JetBrains Mono, monospace" font-size="11" fill="#7d8cc4">固定費 ${yen(d.F)}</text>`;
+
+  // BEP marker
+  if(isFinite(d.BEP) && d.BEP <= maxX*1.01){
+    const bx = x2px(d.BEP), by = y2px(d.BEP);
+    s += `<line x1="${bx}" y1="${by}" x2="${bx}" y2="${padT+plotH}" stroke="#e8b84b" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    s += `<circle cx="${bx}" cy="${by}" r="7" fill="#e8b84b" stroke="#151830" stroke-width="2"/>`;
+    s += `<text x="${bx}" y="${by-14}" font-family="JetBrains Mono, monospace" font-size="12" fill="#e8b84b" text-anchor="middle" font-weight="700">損益分岐点</text>`;
+  }
+
+  // current point
+  const cx = x2px(d.S);
+  const cyS = y2px(d.S);
+  const cyC = y2px(d.F + d.vr*d.S);
+  const curColor = d.profit>=0 ? '#7fbf8f' : '#e0806f';
+  s += `<line x1="${cx}" y1="${cyS}" x2="${cx}" y2="${cyC}" stroke="${curColor}" stroke-width="3" stroke-linecap="round"/>`;
+  s += `<circle cx="${cx}" cy="${cyS}" r="6.5" fill="${curColor}" stroke="#151830" stroke-width="2"/>`;
+  s += `<text x="${cx}" y="${Math.min(cyS,cyC)-14}" font-family="JetBrains Mono, monospace" font-size="12" fill="${curColor}" text-anchor="middle" font-weight="700">${d.profit>=0?'利益':'損失'} ${yen(Math.abs(d.profit))}</text>`;
+
+  // axis titles
+  s += `<text x="${padL+plotW/2}" y="${CH-10}" font-family="Noto Sans JP, sans-serif" font-size="12" fill="#c9c1ae" text-anchor="middle">売上高</text>`;
+  s += `<text x="24" y="${padT+plotH/2}" font-family="Noto Sans JP, sans-serif" font-size="12" fill="#c9c1ae" text-anchor="middle" transform="rotate(-90 24 ${padT+plotH/2})">金額</text>`;
+
+  chartSvg.innerHTML = s;
+}
+
+function render(){
+  const d = calc();
+  updateReadouts(d);
+  renderHero(d);
+  renderChart(d);
+}
+
+[salesEl, vrEl, fcEl].forEach(el => el.addEventListener('input', render));
+chartSvg.setAttribute('viewBox', `0 0 ${CW} ${CH}`);
+
+/* ---------------- SCALE MODE CONTROLS ---------------- */
+const scaleAutoBtn = document.getElementById('scaleAutoBtn');
+const scaleFixedBtn = document.getElementById('scaleFixedBtn');
+const fixedMaxWrap = document.getElementById('fixedMaxWrap');
+const fixedMaxInput = document.getElementById('fixedMaxInput');
+
+function setScaleMode(mode){
+  scaleMode = mode;
+  scaleAutoBtn.classList.toggle('active', mode === 'auto');
+  scaleFixedBtn.classList.toggle('active', mode === 'fixed');
+  fixedMaxWrap.classList.toggle('show', mode === 'fixed');
+  render();
+}
+
+scaleAutoBtn.addEventListener('click', () => setScaleMode('auto'));
+scaleFixedBtn.addEventListener('click', () => setScaleMode('fixed'));
+fixedMaxInput.addEventListener('input', () => {
+  const v = Number(fixedMaxInput.value);
+  if(v > 0){
+    fixedMaxValue = v;
+    if(scaleMode === 'fixed') render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
